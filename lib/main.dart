@@ -20,6 +20,7 @@ class _FishAquariumAppState extends State<FishAquariumApp>
   int fishCount = 0;
   double fishSpeed = 1.0;
   Color fishColor = Colors.blue;
+  String fishImage = 'assets/fish1.png';
   bool collisionEffectEnabled = true;
   Database? database;
 
@@ -35,7 +36,7 @@ class _FishAquariumAppState extends State<FishAquariumApp>
       join(await getDatabasesPath(), 'fish_aquarium.db'),
       onCreate: (db, version) {
         return db.execute(
-          'CREATE TABLE Settings(id INTEGER PRIMARY KEY, fishCount INTEGER, fishSpeed REAL, fishColor INTEGER)',
+          'CREATE TABLE Settings(id INTEGER PRIMARY KEY, fishCount INTEGER, fishSpeed REAL, fishColor INTEGER, fishImage TEXT)',
         );
       },
       version: 1,
@@ -49,8 +50,13 @@ class _FishAquariumAppState extends State<FishAquariumApp>
         fishCount = maps[0]['fishCount'];
         fishSpeed = maps[0]['fishSpeed'];
         fishColor = Color(maps[0]['fishColor']);
+        fishImage = maps[0]['fishImage'];
         for (int i = 0; i < fishCount; i++) {
-          fishList.add(Fish(color: fishColor, speed: fishSpeed, vsync: this));
+          fishList.add(Fish(
+              color: fishColor,
+              image: fishImage,
+              speed: fishSpeed,
+              vsync: this));
         }
       });
     }
@@ -62,7 +68,8 @@ class _FishAquariumAppState extends State<FishAquariumApp>
       {
         'fishCount': fishList.length,
         'fishSpeed': fishSpeed,
-        'fishColor': fishColor.value
+        'fishColor': fishColor.value,
+        'fishImage': fishImage,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -71,7 +78,8 @@ class _FishAquariumAppState extends State<FishAquariumApp>
   void addFish() {
     if (fishList.length < 10) {
       setState(() {
-        fishList.add(Fish(color: fishColor, speed: fishSpeed, vsync: this));
+        fishList.add(Fish(
+            color: fishColor, image: fishImage, speed: fishSpeed, vsync: this));
       });
     }
   }
@@ -79,6 +87,12 @@ class _FishAquariumAppState extends State<FishAquariumApp>
   void changeFishColor(Color color) {
     setState(() {
       fishColor = color;
+    });
+  }
+
+  void changeFishImage(String image) {
+    setState(() {
+      fishImage = image;
     });
   }
 
@@ -123,7 +137,7 @@ class _FishAquariumAppState extends State<FishAquariumApp>
             ),
             Positioned(
               bottom: 0,
-              child: Row(
+              child: Column(
                 children: [
                   ElevatedButton(
                       onPressed: addFish, child: const Text('Add Fish')),
@@ -137,16 +151,23 @@ class _FishAquariumAppState extends State<FishAquariumApp>
                     onChanged: (value) => changeFishSpeed(value),
                     label: 'Speed',
                   ),
-                  DropdownButton<Color>(
-                    value: fishColor,
-                    items: const [
-                      DropdownMenuItem(value: Colors.blue, child: Text('Blue')),
-                      DropdownMenuItem(value: Colors.red, child: Text('Red')),
-                      DropdownMenuItem(
-                          value: Colors.green, child: Text('Green')),
+                  Row(
+                    children: [
+                      Center(
+                        child: DropdownButton<String>(
+                          value: fishImage,
+                          items: List.generate(27, (index) {
+                            String imageName = 'assets/fish${index + 1}.png';
+                            return DropdownMenuItem(
+                              value: imageName,
+                              child: Text(imageName),
+                            );
+                          }),
+                          onChanged: (value) => changeFishImage(value!),
+                        ),
+                      ),
                     ],
-                    onChanged: (value) => changeFishColor(value!),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -165,13 +186,18 @@ class Fish {
   Color color;
   double speed;
   double size = 20;
+  String image;
   late AnimationController controller;
   late Animation<Offset> position;
   Random random = Random();
   bool isColliding = false;
   final TickerProvider vsync;
 
-  Fish({required this.color, required this.speed, required this.vsync}) {
+  Fish(
+      {required this.color,
+      required this.image,
+      required this.speed,
+      required this.vsync}) {
     controller = AnimationController(
       duration: Duration(seconds: (6 ~/ speed)),
       vsync: vsync,
@@ -203,8 +229,11 @@ class Fish {
               width: size,
               height: size,
               decoration: BoxDecoration(
-                color: color,
                 shape: BoxShape.circle,
+                image: DecorationImage(
+                  image: AssetImage(image),
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),
