@@ -1,125 +1,231 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
+import 'dart:async';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() => runApp(const FishAquariumApp());
+
+class FishAquariumApp extends StatefulWidget {
+  const FishAquariumApp({super.key});
+
+  @override
+  // ignore: library_private_types_in_public_api
+  _FishAquariumAppState createState() => _FishAquariumAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _FishAquariumAppState extends State<FishAquariumApp>
+    with TickerProviderStateMixin {
+  List<Fish> fishList = [];
+  int fishCount = 0;
+  double fishSpeed = 1.0;
+  Color fishColor = Colors.blue;
+  bool collisionEffectEnabled = true;
+  Database? database;
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+  void initState() {
+    super.initState();
+    initDatabase();
+    loadSettings();
+  }
+
+  Future<void> initDatabase() async {
+    database = await openDatabase(
+      join(await getDatabasesPath(), 'fish_aquarium.db'),
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE Settings(id INTEGER PRIMARY KEY, fishCount INTEGER, fishSpeed REAL, fishColor INTEGER)',
+        );
+      },
+      version: 1,
     );
   }
-}
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  Future<void> loadSettings() async {
+    final List<Map<String, dynamic>> maps = await database!.query('Settings');
+    if (maps.isNotEmpty) {
+      setState(() {
+        fishCount = maps[0]['fishCount'];
+        fishSpeed = maps[0]['fishSpeed'];
+        fishColor = Color(maps[0]['fishColor']);
+        for (int i = 0; i < fishCount; i++) {
+          fishList.add(Fish(color: fishColor, speed: fishSpeed, vsync: this));
+        }
+      });
+    }
+  }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  Future<void> saveSettings() async {
+    await database!.insert(
+      'Settings',
+      {
+        'fishCount': fishList.length,
+        'fishSpeed': fishSpeed,
+        'fishColor': fishColor.value
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  void addFish() {
+    if (fishList.length < 10) {
+      setState(() {
+        fishList.add(Fish(color: fishColor, speed: fishSpeed, vsync: this));
+      });
+    }
+  }
 
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
+  void changeFishColor(Color color) {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      fishColor = color;
+    });
+  }
+
+  void changeFishSpeed(double speed) {
+    setState(() {
+      fishSpeed = speed;
+      for (var fish in fishList) {
+        fish.updateSpeed(speed);
+      }
+    });
+  }
+
+  void toggleCollisionEffect() {
+    setState(() {
+      collisionEffectEnabled = !collisionEffectEnabled;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('Fish Aquarium')),
+        body: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 300,
+                      height: 300,
+                      color: Colors.blue[100],
+                      child: Stack(
+                        children:
+                            fishList.map((fish) => fish.buildFish()).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Positioned(
+              bottom: 0,
+              child: Row(
+                children: [
+                  ElevatedButton(
+                      onPressed: addFish, child: const Text('Add Fish')),
+                  ElevatedButton(
+                      onPressed: toggleCollisionEffect,
+                      child: const Text('Toggle Collision')),
+                  Slider(
+                    value: fishSpeed,
+                    min: 0.5,
+                    max: 5.0,
+                    onChanged: (value) => changeFishSpeed(value),
+                    label: 'Speed',
+                  ),
+                  DropdownButton<Color>(
+                    value: fishColor,
+                    items: const [
+                      DropdownMenuItem(value: Colors.blue, child: Text('Blue')),
+                      DropdownMenuItem(value: Colors.red, child: Text('Red')),
+                      DropdownMenuItem(
+                          value: Colors.green, child: Text('Green')),
+                    ],
+                    onChanged: (value) => changeFishColor(value!),
+                  )
+                ],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: saveSettings,
+              child: const Text('Save Settings'),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+}
+
+class Fish {
+  Color color;
+  double speed;
+  double size = 20;
+  late AnimationController controller;
+  late Animation<Offset> position;
+  Random random = Random();
+  bool isColliding = false;
+  final TickerProvider vsync;
+
+  Fish({required this.color, required this.speed, required this.vsync}) {
+    controller = AnimationController(
+      duration: Duration(seconds: (6 ~/ speed)),
+      vsync: vsync,
+    );
+    position = Tween<Offset>(
+      begin: Offset(random.nextDouble() * 300, random.nextDouble() * 300),
+      end: Offset(random.nextDouble() * 300, random.nextDouble() * 300),
+    ).animate(controller)
+      ..addListener(() {
+        moveFish();
+      });
+    controller.repeat(reverse: true);
+  }
+
+  void updateSpeed(double newSpeed) {
+    controller.duration = Duration(seconds: (6 ~/ newSpeed));
+  }
+
+  Widget buildFish() {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Positioned(
+          left: position.value.dx,
+          top: position.value.dy,
+          child: Transform.scale(
+            scale: size / 20,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void moveFish() {
+    if (position.value.dx >= 300 ||
+        position.value.dx <= 0 ||
+        position.value.dy >= 300 ||
+        position.value.dy <= 0) {
+      changeDirection();
+    }
+  }
+
+  void changeDirection() {
+    position = Tween<Offset>(
+      begin: Offset(random.nextDouble() * 300, random.nextDouble() * 300),
+      end: Offset(random.nextDouble() * 300, random.nextDouble() * 300),
+    ).animate(controller);
   }
 }
